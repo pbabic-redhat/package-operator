@@ -909,6 +909,7 @@ spec:
   - name: crds
   - name: namespace
   - name: rbac
+  - name: webhook
   - name: deploy
   scopes:
   - Cluster
