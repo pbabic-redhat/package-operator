@@ -5,6 +5,7 @@ metadata:
   namespace: package-operator-system
   annotations:
     package-operator.run/phase: webhook
+    service.beta.openshift.io/inject-cabundle: "true"
 spec:
   ports:
     - port: 443

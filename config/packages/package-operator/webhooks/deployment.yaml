@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/name: package-operator-webook-server
   annotations:
     package-operator.run/phase: webhook
+    service.beta.openshift.io/inject-cabundle: "true"
 spec:
   replicas: 1
   selector:
@@ -44,7 +45,7 @@ spec:
           key: node-role.kubernetes.io/master
       containers:
       - name: webhook
-        image: quay.io/openshift/package-operator-webhook:latest
+        image: quay.io/package-operator/package-operator-webhook:latest
         ports:
         - containerPort: 8080
         volumeMounts:
@@ -70,7 +71,7 @@ spec:
           requests:
             cpu: 100m
             memory: 30Mi
-      volumes:
-      - name: tls
-        secret:
-          secretName: webhook-server-cert
+#      volumes:
+#      - name: tls
+#        secret:
+#          secretName: webhook-server-cert
