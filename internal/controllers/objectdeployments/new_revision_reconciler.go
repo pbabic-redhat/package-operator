@@ -11,7 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	corev1alpha1 "package-operator.run/apis/core/v1alpha1"
 )
 
 type newRevisionReconciler struct {
@@ -43,6 +46,30 @@ func (r *newRevisionReconciler) Reconcile(ctx context.Context,
 	}
 
 	err = r.client.Create(ctx, newObjectSet.ClientObject())
+
+	obj := newObjectSet.ClientObject()
+
+	// TODO: figure out why obj.GetObjectKind().GroupVersionKind() doesn't work
+	gvk, err2 := apiutil.GVKForObject(obj, r.scheme)
+	if err2 != nil {
+		return ctrl.Result{}, fmt.Errorf("errored while getting GVK for object: %w", err)
+	}
+
+	cor := corev1alpha1.ControlledObjectReference{
+		Kind:  gvk.Kind,
+		Group: gvk.Group,
+		Name:  obj.GetName(),
+	}
+
+	if ns := obj.GetNamespace(); len(ns) > 0 {
+		cor.Namespace = ns
+	}
+
+	controllerOf := objectDeployment.GetStatusControllerOf()
+	controllerOf = append(controllerOf, cor)
+
+	objectDeployment.SetStatusControllerOf(controllerOf)
+
 	if err == nil {
 		return ctrl.Result{}, nil
 	}

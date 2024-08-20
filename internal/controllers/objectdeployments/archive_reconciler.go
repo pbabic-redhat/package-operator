@@ -8,6 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	corev1alpha1 "package-operator.run/apis/core/v1alpha1"
 )
 
 const defaultRevisionLimit int32 = 10
@@ -229,6 +231,7 @@ func (a *archiveReconciler) garbageCollectRevisions(
 		revisionLimit = *deploymentRevisionLimit
 	}
 	numToDelete := len(previousObjectSets) - int(revisionLimit)
+	var lastDeleted genericObjectSet
 	for _, previousObjectSet := range previousObjectSets {
 		if numToDelete <= 0 {
 			break
@@ -237,7 +240,30 @@ func (a *archiveReconciler) garbageCollectRevisions(
 		if err := a.client.Delete(ctx, previousObjectSet.ClientObject()); err != nil && !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete objectset: %w", err)
 		}
+		lastDeleted = previousObjectSet
 		numToDelete--
+	}
+
+	if lastDeleted != nil {
+		// update controllerOf if objectset was deleted
+		lastDeletedCor := corev1alpha1.ControlledObjectReference{
+			Kind:  lastDeleted.ClientObject().GetObjectKind().GroupVersionKind().Kind,
+			Group: lastDeleted.ClientObject().GetObjectKind().GroupVersionKind().Group,
+			Name:  lastDeleted.ClientObject().GetName(),
+		}
+		if ns := lastDeleted.ClientObject().GetNamespace(); len(ns) > 0 {
+			lastDeletedCor.Namespace = ns
+		}
+		oldCof := objectDeployment.GetStatusControllerOf()
+		firstToKeep := 0
+		for i, cor := range oldCof {
+			if cor == lastDeletedCor {
+				firstToKeep = i + 1
+				break
+			}
+		}
+		newCof := oldCof[firstToKeep:]
+		objectDeployment.SetStatusControllerOf(newCof)
 	}
 
 	return nil
